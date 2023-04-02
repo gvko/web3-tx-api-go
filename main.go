@@ -79,6 +79,50 @@ func populateDbs(txs []Transaction) {
 	//fmt.Printf("%+v\n\n", transactions)
 }
 
+func getTxsByFromAddr(from string) []Transaction {
+	var txs []Transaction = []Transaction{}
+	for _, txIndex := range txsByFromAddr[from] {
+		txs = append(txs, transactions[txIndex])
+	}
+
+	return txs
+}
+
+func getTxsByToAddr(to string) []Transaction {
+	var txs []Transaction = []Transaction{}
+	for _, txIndex := range txsByToAddr[to] {
+		txs = append(txs, transactions[txIndex])
+	}
+
+	return txs
+}
+
+func getTxsByValue(aboveValueStr string) []Transaction {
+	var txs []Transaction = []Transaction{}
+	aboveValue, err := strconv.ParseInt(aboveValueStr, 10, 64)
+	if err != nil {
+		// TODO: handle error
+		panic("'aboveValue' must be a valid integer")
+	}
+
+	for key, txIndexes := range txsByValue {
+		keyAsInt, err := strconv.ParseInt(key, 10, 64)
+		if err != nil {
+			// TODO: handle error
+			fmt.Println("Key is not a valid integer", key)
+			continue
+		}
+
+		if keyAsInt > aboveValue {
+			for _, txIndex := range txIndexes {
+				txs = append(txs, transactions[txIndex])
+			}
+		}
+	}
+
+	return txs
+}
+
 func setupRouter() *gin.Engine {
 	router := gin.Default()
 
@@ -94,49 +138,23 @@ func setupRouter() *gin.Engine {
 	router.GET("/transactions", func(ctx *gin.Context) {
 		from := ctx.Query("from")
 		to := ctx.Query("to")
+		aboveValueStr := ctx.Query("aboveValue")
 		//limit := ctx.Query("limit")
 		//offset := ctx.Query("offset")
-		aboveValueStr := ctx.Query("aboveValue")
 		// TODO: input validation for the query params
 
-		var txs []Transaction = []Transaction{}
-
 		if from != "" {
-			for _, txIndex := range txsByFromAddr[from] {
-				txs = append(txs, transactions[txIndex])
-			}
+			txs := getTxsByFromAddr(from)
 			ctx.JSON(http.StatusOK, txs)
 			return
 		}
 		if to != "" {
-			for _, txIndex := range txsByToAddr[to] {
-				txs = append(txs, transactions[txIndex])
-			}
+			txs := getTxsByToAddr(to)
 			ctx.JSON(http.StatusOK, txs)
 			return
 		}
 		if aboveValueStr != "" {
-			aboveValue, err := strconv.ParseInt(aboveValueStr, 10, 64)
-			if err != nil {
-				// TODO: handle error
-				panic("'aboveValue' must be a valid integer")
-			}
-
-			for key, txIndexes := range txsByValue {
-				keyAsInt, err := strconv.ParseInt(key, 10, 64)
-				if err != nil {
-					// TODO: handle error
-					fmt.Println("Key is not a valid integer", key)
-					continue
-				}
-
-				if keyAsInt > aboveValue {
-					for _, txIndex := range txIndexes {
-						txs = append(txs, transactions[txIndex])
-					}
-				}
-			}
-
+			txs := getTxsByValue(aboveValueStr)
 			ctx.JSON(http.StatusOK, txs)
 			return
 		}
