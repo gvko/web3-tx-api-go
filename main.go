@@ -151,6 +151,26 @@ func getTxsByValue(aboveValueStr string) []Transaction {
 	return txs
 }
 
+func computePagination(offsetStr string, limitStr string) (int, int) {
+	txsCount := len(transactions)
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		limit = txsCount // Default to returning all txs
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		offset = 0 // Default to starting at the first item
+	}
+
+	end := offset + limit
+	if end > txsCount {
+		end = txsCount
+	}
+
+	return offset, end
+}
+
 func setupRouter() *gin.Engine {
 	router := gin.Default()
 
@@ -187,9 +207,10 @@ func setupRouter() *gin.Engine {
 		from := ctx.Query("from")
 		to := ctx.Query("to")
 		aboveValueStr := ctx.Query("aboveValue")
-		//limit := ctx.Query("limit")
-		//offset := ctx.Query("offset")
+		offsetStr := ctx.Query("offset")
+		limitStr := ctx.Query("limit")
 		// TODO: input validation for the query params
+		offset, end := computePagination(offsetStr, limitStr)
 
 		if from != "" && to != "" {
 			txs := getTxsByFromAndToAddr(from, to)
@@ -213,7 +234,7 @@ func setupRouter() *gin.Engine {
 		}
 
 		// no query params were provided, so return ALL txs
-		ctx.JSON(http.StatusOK, transactions)
+		ctx.JSON(http.StatusOK, transactions[offset:end])
 	})
 
 	return router
