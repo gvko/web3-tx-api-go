@@ -7,6 +7,7 @@ import (
 	"github.com/joho/godotenv"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 )
@@ -40,24 +41,26 @@ type ApiResponse struct {
 }
 
 var etherscanApiKey = ""
-var apiUrl = "https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=0x9355372396e3F6daF13359B7b607a3374cc638e0&page=1&offset=10&sort=asc&apikey="
+var apiUrl = "https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=0x9355372396e3F6daF13359B7b607a3374cc638e0&sort=asc"
 var transactions []Transaction = make([]Transaction, 0)
 var txsByFromAddr map[string][]int = make(map[string][]int)
 var txsByToAddr map[string][]int = make(map[string][]int)
 var txsByValue map[string][]int = make(map[string][]int)
 
-func getEtherscanData() []Transaction {
+func getEtherscanData(apiUrl string) []Transaction {
 	log.Println("Get and populate Etherscan data...")
-	resp, err := http.Get(apiUrl)
+	res, err := http.Get(apiUrl)
 	if err != nil {
+		// TODO: recover from error
 		panic(err)
 	}
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
 	var response ApiResponse
 
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	err = json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
+		// TODO: recover from error
 		panic(err)
 	}
 
@@ -156,7 +159,27 @@ func setupRouter() *gin.Engine {
 	})
 
 	router.GET("/etherscan-data", func(ctx *gin.Context) {
-		txs := getEtherscanData()
+		page := ctx.Query("page")
+		offset := ctx.Query("offset")
+
+		urlBuild, err := url.Parse(apiUrl)
+		if err != nil {
+			// TODO: handle error
+			panic("API base url is not a valid url")
+		}
+
+		query := urlBuild.Query()
+		if page != "" {
+			query.Set("page", page)
+		}
+		if offset != "" {
+			query.Set("offset", offset)
+		}
+		query.Set("apiKey", etherscanApiKey)
+		urlBuild.RawQuery = query.Encode()
+
+		urlStr := urlBuild.String()
+		txs := getEtherscanData(urlStr)
 		populateDbs(txs)
 	})
 
@@ -202,7 +225,6 @@ func main() {
 		panic("Could not load env vars from .env file")
 	}
 	etherscanApiKey = os.Getenv("ETHERSCAN_API_KEY")
-	apiUrl += etherscanApiKey
 
 	r := setupRouter()
 	r.Run(":8080")
