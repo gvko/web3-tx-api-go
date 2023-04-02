@@ -88,6 +88,31 @@ func getTxsByFromAddr(from string) []Transaction {
 	return txs
 }
 
+func getTxsByFromAndToAddr(from string, to string) []Transaction {
+	txsFrom := getTxsByFromAddr(from)
+	txsTo := getTxsByToAddr(to)
+	lenTxsFrom := len(txsFrom)
+	lenTxsTo := len(txsTo)
+	var txs []Transaction = []Transaction{}
+
+	// For optimization purposes only loop thru the shorter list
+	if lenTxsFrom < lenTxsTo {
+		for _, tx := range txsFrom {
+			if tx.To == to {
+				txs = append(txs, tx)
+			}
+		}
+	} else {
+		for _, tx := range txsTo {
+			if tx.From == from {
+				txs = append(txs, tx)
+			}
+		}
+	}
+
+	return txs
+}
+
 func getTxsByToAddr(to string) []Transaction {
 	var txs []Transaction = []Transaction{}
 	for _, txIndex := range txsByToAddr[to] {
@@ -143,6 +168,11 @@ func setupRouter() *gin.Engine {
 		//offset := ctx.Query("offset")
 		// TODO: input validation for the query params
 
+		if from != "" && to != "" {
+			txs := getTxsByFromAndToAddr(from, to)
+			ctx.JSON(http.StatusOK, txs)
+			return
+		}
 		if from != "" {
 			txs := getTxsByFromAddr(from)
 			ctx.JSON(http.StatusOK, txs)
