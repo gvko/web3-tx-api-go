@@ -42,10 +42,10 @@ type ApiResponse struct {
 
 var etherscanApiKey = ""
 var apiUrl = "https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=0x9355372396e3F6daF13359B7b607a3374cc638e0&sort=asc"
-var transactions []Transaction = make([]Transaction, 0)
-var txsByFromAddr map[string][]int = make(map[string][]int)
-var txsByToAddr map[string][]int = make(map[string][]int)
-var txsByValue map[string][]int = make(map[string][]int)
+var transactions = make([]Transaction, 0)
+var txsByFromAddr = make(map[string][]int)
+var txsByToAddr = make(map[string][]int)
+var txsByValue = make(map[string][]int)
 
 func getEtherscanData(apiUrl string) []Transaction {
 	log.Println("Get and populate Etherscan data...")
@@ -68,8 +68,12 @@ func getEtherscanData(apiUrl string) []Transaction {
 }
 
 func populateDbs(txs []Transaction) {
-	// reset the DB, so it only holds 100 records
+	// reset the DBs, so the main one only holds 100 records
+	// and the index DBs are re-populated, to ensure correct data
 	transactions = transactions[:0]
+	txsByFromAddr = make(map[string][]int)
+	txsByToAddr = make(map[string][]int)
+	txsByValue = make(map[string][]int)
 
 	for index, tx := range txs {
 		transactions = append(transactions, tx)
@@ -78,8 +82,6 @@ func populateDbs(txs []Transaction) {
 		txsByToAddr[tx.To] = append(txsByToAddr[tx.To], index)
 		txsByValue[tx.Value] = append(txsByValue[tx.Value], index)
 	}
-
-	//fmt.Printf("%+v\n\n", transactions)
 }
 
 func getTxsByFromAddr(from string) []Transaction {
