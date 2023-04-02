@@ -1,74 +1,123 @@
 package main
 
 import (
-	"net/http"
-
+	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"net/http"
+	"os"
 )
 
-var db = make(map[string]string)
+type Transaction struct {
+	BlockNumber       string `json:"blockNumber"`
+	TimeStamp         string `json:"timeStamp"`
+	Hash              string `json:"hash"`
+	Nonce             string `json:"nonce"`
+	BlockHash         string `json:"blockHash"`
+	From              string `json:"from"`
+	ContractAddress   string `json:"contractAddress"`
+	To                string `json:"to"`
+	Value             string `json:"value"`
+	TokenName         string `json:"tokenName"`
+	TokenSymbol       string `json:"tokenSymbol"`
+	TokenDecimal      string `json:"tokenDecimal"`
+	TransactionIndex  string `json:"transactionIndex"`
+	Gas               string `json:"gas"`
+	GasPrice          string `json:"gasPrice"`
+	GasUsed           string `json:"gasUsed"`
+	CumulativeGasUsed string `json:"cumulativeGasUsed"`
+	Input             string `json:"input"`
+	Confirmations     string `json:"confirmations"`
+}
+
+type ApiResponse struct {
+	Status       string        `json:"status"`
+	Message      string        `json:"message"`
+	Transactions []Transaction `json:"result"`
+}
+
+var etherscanApiKey = ""
+var apiUrl = "https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=0x9355372396e3F6daF13359B7b607a3374cc638e0&page=1&offset=2&sort=asc&apikey="
+var transactions []Transaction = make([]Transaction, 0)
+var txsFromAddr map[string][]int = make(map[string][]int)
+var txsToAddr map[string][]int = make(map[string][]int)
+var txsValue map[string][]int = make(map[string][]int)
+
+func getEtherscanData() []Transaction {
+	fmt.Println("Getting Etherscan data...")
+	resp, err := http.Get(apiUrl)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	var response ApiResponse
+
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		panic(err)
+	}
+
+	return response.Transactions
+}
+
+func populateDbs(txs []Transaction) {
+	// reset the DB, so it only holds 100 records
+	transactions = transactions[:0]
+
+	for index, tx := range txs {
+		transactions = append(transactions, tx)
+
+		txsFromAddr[tx.From] = append(txsFromAddr[tx.From], index)
+		txsToAddr[tx.To] = append(txsToAddr[tx.To], index)
+		txsValue[tx.Value] = append(txsValue[tx.Value], index)
+	}
+
+	//fmt.Printf("%+v\n\n", transactions)
+	//fmt.Printf("%+v\n\n", txsFromAddr)
+	//fmt.Printf("%+v\n\n", txsToAddr)
+	//fmt.Printf("%+v\n\n", txsValue)
+}
 
 func setupRouter() *gin.Engine {
-	// Disable Console Color
-	// gin.DisableConsoleColor()
-	r := gin.Default()
+	router := gin.Default()
 
-	// Ping test
-	r.GET("/ping", func(c *gin.Context) {
-		c.String(http.StatusOK, "pong")
+	router.GET("/ping", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "pong")
 	})
 
-	// Get user value
-	r.GET("/user/:name", func(c *gin.Context) {
-		user := c.Params.ByName("name")
-		value, ok := db[user]
-		if ok {
-			c.JSON(http.StatusOK, gin.H{"user": user, "value": value})
-		} else {
-			c.JSON(http.StatusOK, gin.H{"user": user, "status": "no value"})
-		}
+	router.GET("/etherscan-data", func(ctx *gin.Context) {
+		txs := getEtherscanData()
+		populateDbs(txs)
 	})
 
-	// Authorized group (uses gin.BasicAuth() middleware)
-	// Same than:
-	// authorized := r.Group("/")
-	// authorized.Use(gin.BasicAuth(gin.Credentials{
-	//	  "foo":  "bar",
-	//	  "manu": "123",
-	//}))
-	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-		"foo":  "bar", // user:foo password:bar
-		"manu": "123", // user:manu password:123
-	}))
+	router.GET("/transactions", func(ctx *gin.Context) {
+		//from := ctx.Query("from")
+		//to := ctx.Query("to")
+		//limit := ctx.Query("limit")
+		//offset := ctx.Query("offset")
+		//aboveValue := ctx.Query("aboveValue")
 
-	/* example curl for /admin with basicauth header
-	   Zm9vOmJhcg== is base64("foo:bar")
-
-		curl -X POST \
-	  	http://localhost:8080/admin \
-	  	-H 'authorization: Basic Zm9vOmJhcg==' \
-	  	-H 'content-type: application/json' \
-	  	-d '{"value":"bar"}'
-	*/
-	authorized.POST("admin", func(c *gin.Context) {
-		user := c.MustGet(gin.AuthUserKey).(string)
-
-		// Parse JSON
-		var json struct {
-			Value string `json:"value" binding:"required"`
-		}
-
-		if c.Bind(&json) == nil {
-			db[user] = json.Value
-			c.JSON(http.StatusOK, gin.H{"status": "ok"})
-		}
+		//value, ok := transactions[from]
+		//if ok {
+		//	ctx.JSON(http.StatusOK, gin.H{"from": from, "value": value})
+		//} else {
+		//	ctx.JSON(http.StatusOK, gin.H{"from": from, "status": "no value"})
+		//}
 	})
 
-	return r
+	return router
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		panic("Could not load env vars from .env file")
+	}
+	etherscanApiKey = os.Getenv("ETHERSCAN_API_KEY")
+	apiUrl += etherscanApiKey
+
 	r := setupRouter()
-	// Listen and Server in 0.0.0.0:8080
 	r.Run(":8080")
 }
