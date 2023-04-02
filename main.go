@@ -13,26 +13,28 @@ import (
 )
 
 type Transaction struct {
-	BlockNumber       string `json:"blockNumber"`
-	TimeStamp         string `json:"timeStamp"`
-	Hash              string `json:"hash"`
-	Nonce             string `json:"nonce"`
-	BlockHash         string `json:"blockHash"`
-	From              string `json:"from"`
-	ContractAddress   string `json:"contractAddress"`
-	To                string `json:"to"`
-	Value             string `json:"value"`
-	TokenName         string `json:"tokenName"`
-	TokenSymbol       string `json:"tokenSymbol"`
-	TokenDecimal      string `json:"tokenDecimal"`
-	TransactionIndex  string `json:"transactionIndex"`
-	Gas               string `json:"gas"`
-	GasPrice          string `json:"gasPrice"`
-	GasUsed           string `json:"gasUsed"`
-	CumulativeGasUsed string `json:"cumulativeGasUsed"`
-	Input             string `json:"input"`
-	Confirmations     string `json:"confirmations"`
+	BlockNumber string `json:"blockNumber"`
+	TimeStamp   string `json:"timeStamp"`
+	Hash        string `json:"hash"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	Value       string `json:"value"`
 }
+
+//ContractAddress   string `json:"contractAddress"`
+//Nonce             string `json:"nonce"`
+//BlockHash         string `json:"blockHash"`
+//TokenName         string `json:"tokenName"`
+//TokenSymbol       string `json:"tokenSymbol"`
+//TokenDecimal      string `json:"tokenDecimal"`
+//TransactionIndex  string `json:"transactionIndex"`
+//Gas               string `json:"gas"`
+//GasPrice          string `json:"gasPrice"`
+//GasUsed           string `json:"gasUsed"`
+//CumulativeGasUsed string `json:"cumulativeGasUsed"`
+//Input             string `json:"input"`
+//Confirmations     string `json:"confirmations"`
+//}
 
 type ApiResponse struct {
 	Status       string        `json:"status"`
@@ -93,6 +95,15 @@ func getTxsByFromAddr(from string) []Transaction {
 	return txs
 }
 
+func getTxsByToAddr(to string) []Transaction {
+	var txs []Transaction = []Transaction{}
+	for _, txIndex := range txsByToAddr[to] {
+		txs = append(txs, transactions[txIndex])
+	}
+
+	return txs
+}
+
 func getTxsByFromAndToAddr(from string, to string) []Transaction {
 	txsFrom := getTxsByFromAddr(from)
 	txsTo := getTxsByToAddr(to)
@@ -113,15 +124,6 @@ func getTxsByFromAndToAddr(from string, to string) []Transaction {
 				txs = append(txs, tx)
 			}
 		}
-	}
-
-	return txs
-}
-
-func getTxsByToAddr(to string) []Transaction {
-	var txs []Transaction = []Transaction{}
-	for _, txIndex := range txsByToAddr[to] {
-		txs = append(txs, transactions[txIndex])
 	}
 
 	return txs
