@@ -193,14 +193,17 @@ func setupRouter() *gin.Engine {
 		if page != "" {
 			query.Set("page", page)
 		}
-		if offset != "" {
-			query.Set("offset", offset)
+		if offset == "" {
+			// Etherscan's API uses offset as limit. Set default limit to 100
+			offset = "100"
 		}
+		query.Set("offset", offset)
 		query.Set("apiKey", etherscanApiKey)
 		urlBuild.RawQuery = query.Encode()
 
 		urlStr := urlBuild.String()
 		txs := getEtherscanData(urlStr)
+		fmt.Println(len(txs))
 		populateDbs(txs)
 	})
 
