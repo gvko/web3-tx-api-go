@@ -151,8 +151,9 @@ func getTxsByValue(aboveValueStr string) []Transaction {
 	return txs
 }
 
-func computePagination(offsetStr string, limitStr string) (int, int) {
-	txsCount := len(transactions)
+func computePagination(offsetStr string, limitStr string, txs []Transaction) (int, int) {
+	txsCount := len(txs)
+
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
 		limit = txsCount // Default to returning all txs
@@ -210,31 +211,24 @@ func setupRouter() *gin.Engine {
 		offsetStr := ctx.Query("offset")
 		limitStr := ctx.Query("limit")
 		// TODO: input validation for the query params
-		offset, end := computePagination(offsetStr, limitStr)
+
+		var txs []Transaction = []Transaction{}
 
 		if from != "" && to != "" {
-			txs := getTxsByFromAndToAddr(from, to)
-			ctx.JSON(http.StatusOK, txs)
-			return
-		}
-		if from != "" {
-			txs := getTxsByFromAddr(from)
-			ctx.JSON(http.StatusOK, txs)
-			return
-		}
-		if to != "" {
-			txs := getTxsByToAddr(to)
-			ctx.JSON(http.StatusOK, txs)
-			return
-		}
-		if aboveValueStr != "" {
-			txs := getTxsByValue(aboveValueStr)
-			ctx.JSON(http.StatusOK, txs)
-			return
+			txs = getTxsByFromAndToAddr(from, to)
+		} else if from != "" {
+			txs = getTxsByFromAddr(from)
+		} else if to != "" {
+			txs = getTxsByToAddr(to)
+		} else if aboveValueStr != "" {
+			txs = getTxsByValue(aboveValueStr)
+		} else {
+			// no query params were provided, so return ALL txs
+			txs = transactions
 		}
 
-		// no query params were provided, so return ALL txs
-		ctx.JSON(http.StatusOK, transactions[offset:end])
+		offset, end := computePagination(offsetStr, limitStr, txs)
+		ctx.JSON(http.StatusOK, txs[offset:end])
 	})
 
 	return router
