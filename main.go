@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 type Transaction struct {
@@ -38,14 +40,14 @@ type ApiResponse struct {
 }
 
 var etherscanApiKey = ""
-var apiUrl = "https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=0x9355372396e3F6daF13359B7b607a3374cc638e0&page=1&offset=2&sort=asc&apikey="
+var apiUrl = "https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=0x9355372396e3F6daF13359B7b607a3374cc638e0&page=1&offset=10&sort=asc&apikey="
 var transactions []Transaction = make([]Transaction, 0)
-var txsFromAddr map[string][]int = make(map[string][]int)
-var txsToAddr map[string][]int = make(map[string][]int)
-var txsValue map[string][]int = make(map[string][]int)
+var txsByFromAddr map[string][]int = make(map[string][]int)
+var txsByToAddr map[string][]int = make(map[string][]int)
+var txsByValue map[string][]int = make(map[string][]int)
 
 func getEtherscanData() []Transaction {
-	fmt.Println("Getting Etherscan data...")
+	log.Println("Get and populate Etherscan data...")
 	resp, err := http.Get(apiUrl)
 	if err != nil {
 		panic(err)
@@ -69,15 +71,12 @@ func populateDbs(txs []Transaction) {
 	for index, tx := range txs {
 		transactions = append(transactions, tx)
 
-		txsFromAddr[tx.From] = append(txsFromAddr[tx.From], index)
-		txsToAddr[tx.To] = append(txsToAddr[tx.To], index)
-		txsValue[tx.Value] = append(txsValue[tx.Value], index)
+		txsByFromAddr[tx.From] = append(txsByFromAddr[tx.From], index)
+		txsByToAddr[tx.To] = append(txsByToAddr[tx.To], index)
+		txsByValue[tx.Value] = append(txsByValue[tx.Value], index)
 	}
 
 	//fmt.Printf("%+v\n\n", transactions)
-	//fmt.Printf("%+v\n\n", txsFromAddr)
-	//fmt.Printf("%+v\n\n", txsToAddr)
-	//fmt.Printf("%+v\n\n", txsValue)
 }
 
 func setupRouter() *gin.Engine {
@@ -93,18 +92,57 @@ func setupRouter() *gin.Engine {
 	})
 
 	router.GET("/transactions", func(ctx *gin.Context) {
-		//from := ctx.Query("from")
-		//to := ctx.Query("to")
+		from := ctx.Query("from")
+		to := ctx.Query("to")
 		//limit := ctx.Query("limit")
 		//offset := ctx.Query("offset")
-		//aboveValue := ctx.Query("aboveValue")
+		aboveValueStr := ctx.Query("aboveValue")
+		// TODO: input validation for the query params
 
-		//value, ok := transactions[from]
-		//if ok {
-		//	ctx.JSON(http.StatusOK, gin.H{"from": from, "value": value})
-		//} else {
-		//	ctx.JSON(http.StatusOK, gin.H{"from": from, "status": "no value"})
-		//}
+		var txs []Transaction = []Transaction{}
+
+		if from != "" {
+			for _, txIndex := range txsByFromAddr[from] {
+				txs = append(txs, transactions[txIndex])
+			}
+			ctx.JSON(http.StatusOK, txs)
+			return
+		}
+		if to != "" {
+			for _, txIndex := range txsByToAddr[to] {
+				txs = append(txs, transactions[txIndex])
+			}
+			ctx.JSON(http.StatusOK, txs)
+			return
+		}
+		if aboveValueStr != "" {
+			aboveValue, err := strconv.ParseInt(aboveValueStr, 10, 64)
+			if err != nil {
+				// TODO: handle error
+				panic("'aboveValue' must be a valid integer")
+			}
+
+			for key, txIndexes := range txsByValue {
+				keyAsInt, err := strconv.ParseInt(key, 10, 64)
+				if err != nil {
+					// TODO: handle error
+					fmt.Println("Key is not a valid integer", key)
+					continue
+				}
+
+				if keyAsInt > aboveValue {
+					for _, txIndex := range txIndexes {
+						txs = append(txs, transactions[txIndex])
+					}
+				}
+			}
+
+			ctx.JSON(http.StatusOK, txs)
+			return
+		}
+
+		// no query params were provided, so return ALL txs
+		ctx.JSON(http.StatusOK, transactions)
 	})
 
 	return router
